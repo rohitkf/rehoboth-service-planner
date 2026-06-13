@@ -64,7 +64,12 @@ export function useAuth() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        // Send the email confirmation link back to the deployed app
+        // instead of Supabase's default Site URL (often localhost).
+        emailRedirectTo: window.location.origin,
+      },
     })
     if (error) throw error
   }
