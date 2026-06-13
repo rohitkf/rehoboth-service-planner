@@ -8,6 +8,7 @@ import { PlanSelector } from './components/plan/PlanSelector'
 import { PlanEditor } from './components/plan/PlanEditor'
 import { PlanPrintView } from './components/plan/PlanPrintView'
 import { supabaseMisconfigured } from './lib/supabase'
+import { useToast } from './hooks/useToast'
 import type { ServicePlan } from './types'
 
 const DEBOUNCE_MS = 1500
@@ -36,8 +37,9 @@ function MisconfiguredScreen() {
 export function App() {
   if (supabaseMisconfigured) return <MisconfiguredScreen />
   const { session, profile, loading: authLoading, isAdmin, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut } = useAuth()
-  const { plans, loading: plansLoading, saving, createPlan, updatePlan, deletePlan } = usePlans()
+  const { plans, loading: plansLoading, saving, createPlan, updatePlan, deletePlan, restorePlan } = usePlans()
   const { handlePrint } = usePrintTrigger()
+  const { showToast, showUndoToast } = useToast()
   const [activePlan, setActivePlan] = useState<ServicePlan | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -59,14 +61,31 @@ export function App() {
 
   async function handleCreatePlan(date: string) {
     const plan = await createPlan(date)
-    if (plan) setActivePlan(plan)
+    if (plan) {
+      setActivePlan(plan)
+      showToast('Plan created', 'success')
+    } else {
+      showToast('Could not create plan', 'error')
+    }
   }
 
   function handleDeletePlan(id: string) {
+    const removed = plans.find(p => p.id === id)
     deletePlan(id)
     if (activePlan?.id === id) {
       const remaining = plans.filter(p => p.id !== id)
       setActivePlan(remaining[0] ?? null)
+    }
+    if (removed) {
+      showUndoToast('Plan deleted', async () => {
+        const restored = await restorePlan(removed)
+        if (restored) {
+          setActivePlan(restored)
+          showToast('Plan restored', 'success')
+        } else {
+          showToast('Could not restore plan', 'error')
+        }
+      })
     }
   }
 

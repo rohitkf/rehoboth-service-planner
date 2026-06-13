@@ -57,9 +57,27 @@ export function usePlans() {
     setPlans(prev => prev.filter(p => p.id !== id))
   }
 
+  // Re-insert a previously deleted plan, preserving its date and data.
+  async function restorePlan(plan: ServicePlan): Promise<ServicePlan | null> {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from('service_plans')
+      .insert({
+        date: plan.date,
+        plan_data: plan.plan_data,
+        created_by: plan.created_by ?? user?.id ?? null,
+      })
+      .select()
+      .single()
+    if (error || !data) return null
+    const restored = data as ServicePlan
+    setPlans(prev => [restored, ...prev].sort((a, b) => b.date.localeCompare(a.date)))
+    return restored
+  }
+
   function getPlanByDate(date: string): ServicePlan | undefined {
     return plans.find(p => p.date === date)
   }
 
-  return { plans, loading, saving, createPlan, updatePlan, deletePlan, getPlanByDate, refetch: fetchPlans }
+  return { plans, loading, saving, createPlan, updatePlan, deletePlan, restorePlan, getPlanByDate, refetch: fetchPlans }
 }
